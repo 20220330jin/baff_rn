@@ -13,9 +13,11 @@ const App = () => {
   const webViewRef = useRef<WebView>(null);
 
   // Make sure this IP is correct and includes the query parameter
-  const WEB_URL = 'http://192.168.139.167:5173/?isReactNativeApp=true';
-  // const WEB_URL = 'https://baff-fe.vercel.app/?isReactNativeApp=true';
-  const BACKEND_URL = 'http://10.0.2.2:8080'; // Assuming backend runs on 8080
+  // const WEB_URL = 'http://192.168.139.167:5173/?isReactNativeApp=true';
+  // const WEB_URL = 'http://192.168.35.228:5173/?isReactNativeApp=true';
+  const WEB_URL = 'https://baff-fe.vercel.app/?isReactNativeApp=true';
+  // const BACKEND_URL = 'http://10.0.2.2:8080'; // Assuming backend runs on 8080
+  const BACKEND_URL = 'https://baff-be-ckop.onrender.com'; // Assuming backend runs on 8080
 
   // Google Web Client ID from AuthController.java
   const GOOGLE_WEB_CLIENT_ID =
@@ -32,32 +34,57 @@ const App = () => {
 
   const _signIn = async () => {
     try {
-      console.log("RN: 로그인 시도");
+      console.log('RN: 로그인 시도');
       await GoogleSignin.hasPlayServices();
       const userInfo: SignInResponse = await GoogleSignin.signIn();
-      console.log("RN: 로그인 성공", userInfo);
+      console.log('RN: 로그인 성공', userInfo);
 
-
-
-      // 🔥 수정: injectJavaScript를 사용하여 메시지 전송
-      // const messageData = {
-      //   type: 'GOOGLE_LOGIN_SUCCESS',
-      //   user: {
-      //     id: userInfo.data!.id,
-      //     email: userInfo.data!.email,
-      //     name: userInfo.data!.name,
-      //     picture: userInfo.data!.photo,
-      //     provider: 'google'
-      //   },
-      //   redirectTo: '/dashboard'
-      // };
-
-      const messageData = {
-        sibal: 'sse Ki'
+      const idToken = userInfo.data?.idToken;
+      if (!idToken) {
+        throw new Error('Google Id Token을 얻을 수 없습니다.');
       }
 
-      const jsCode = `
-        console.log('RN: 웹으로 메시지 전송 중:', ${JSON.stringify(messageData)});
+      console.log('RN: 백엔드에 IdToken 전송중...');
+
+      try {
+        const backendResponse = await axios.post(
+          `${BACKEND_URL}/api/auth/google/mobile`,
+          {
+            idToken: idToken,
+          },
+          {
+            timeout: 10000, // 10초 타임아웃
+          },
+        );
+
+        const { token: accessToken, user: backendUser } = backendResponse.data;
+        console.log('RN: 백엔드 응답 성공');
+        console.log('- Access Token:', accessToken ? 'received' : 'missing');
+        console.log('- User Data:', backendUser);
+
+        await AsyncStorage.setItem('userToken', accessToken);
+        console.log('RN: 토큰 저장 완료');
+
+        // 🔥 수정: injectJavaScript를 사용하여 메시지 전송
+        const messageData = {
+          type: 'GOOGLE_LOGIN_SUCCESS',
+          user: {
+            // id: userInfo.data?.user.id,
+            id: backendUser.userId,
+            email: userInfo.data?.user.email,
+            name: userInfo.data?.user.name,
+            picture: userInfo.data?.user.photo,
+            provider: 'google',
+          },
+          accessToken: accessToken,
+          redirectTo: 'https://baff-fe.vercel.app',
+        };
+
+        const jsCode = `
+        console.log('RN: 웹으로 메시지 전송 중:', ${JSON.stringify(
+          messageData,
+        )});
+        document.cookie = 'accessToken=${accessToken}; path=/; max-age=604800;';
         
         // 방법 1: window.postMessage 사용
         window.postMessage(${JSON.stringify(messageData)}, '*');
@@ -73,18 +100,58 @@ const App = () => {
         true; // injectJavaScript는 반드시 true를 반환해야 함
       `;
 
-      webViewRef.current?.injectJavaScript(jsCode);
+        webViewRef.current?.injectJavaScript(jsCode);
+        console.log('RN: 웹뷰에 메시지 전송 완료');
+      } catch (backendError: any) {
+        console.error('RN: 백엔드 API 호출 실패:', backendError);
 
-    } catch (error) {
-      console.log("RN: 로그인 실패", error);
+        const errorMessage =
+          backendError.response?.data?.message ||
+          backendError.message ||
+          '백엔드 로그인 처리 중 오류가 발생했습니다.';
+
+        const errorData = {
+          type: 'GOOGLE_LOGIN_ERROR',
+          message: errorMessage,
+          details: {
+            status: backendError.response?.status,
+            data: backendError.response?.data,
+          },
+        };
+
+        const errorJsCode = `
+          console.log('RN→웹: 에러 메시지 전송', ${JSON.stringify(errorData)});
+          window.postMessage(${JSON.stringify(errorData)}, '*');
+          window.dispatchEvent(new CustomEvent('googleLoginError', {
+            detail: ${JSON.stringify(errorData)}
+          }));
+          true;
+        `;
+
+        webViewRef.current?.injectJavaScript(errorJsCode);
+        Alert.alert('로그인 오류', `백엔드 처리 실패: ${errorMessage}`);
+      }
+    } catch (error: any) {
+      console.log('RN: 구글 로그인 실패', error);
+
+      // 🔥 수정: 구글 로그인 자체 실패 처리
+      let errorMessage = '구글 로그인에 실패했습니다.';
+
+      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+        errorMessage = '사용자가 로그인을 취소했습니다.';
+      } else if (error.code === statusCodes.IN_PROGRESS) {
+        errorMessage = '이미 로그인 작업이 진행 중입니다.';
+      } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        errorMessage = 'Google Play 서비스가 없거나 오래되었습니다.';
+      }
 
       const errorData = {
         type: 'GOOGLE_LOGIN_ERROR',
-        message: '구글 로그인에 실패했습니다.'
+        message: errorMessage,
       };
 
       const errorJsCode = `
-        console.log('RN: 에러 메시지 전송 중:', ${JSON.stringify(errorData)});
+        console.log('RN→웹: 에러 메시지 전송', ${JSON.stringify(errorData)});
         window.postMessage(${JSON.stringify(errorData)}, '*');
         window.dispatchEvent(new CustomEvent('googleLoginError', {
           detail: ${JSON.stringify(errorData)}
@@ -93,9 +160,9 @@ const App = () => {
       `;
 
       webViewRef.current?.injectJavaScript(errorJsCode);
+      Alert.alert('로그인 실패', errorMessage);
     }
-  }
-
+  };
 
   // const _signIn = async () => {
   //   try {
@@ -197,21 +264,22 @@ const App = () => {
     }
   };
 
-
-
   // "퐁" 받기
   const handleWebMessage = useCallback((event: any) => {
     try {
       const message = JSON.parse(event.nativeEvent.data);
       console.log('[App] 웹으로부터 메시지 받음:', message);
 
-      if (message.type === 'PONG') {
-        Alert.alert('성공!', '웹으로부터 PONG 메시지를 받았습니다!');
-      } else if (message.type === 'CUSTOM_LOG') { // CUSTOM_LOG 처리
-        console.log(message.payload.message, ...(message.payload.args || []));
+      switch (message.type) {
+        case 'REQUEST_GOOGLE_LOGIN':
+          console.log('REQUEST_GOOGLE_LOGIN');
+          _signIn();
+          break;
+        default:
+          console.log('[App] <UNK> <UNK> <UNK> <UNK>');
       }
-    } catch (e) {
-      console.error('[App] 메시지 파싱 오류:', e);
+    } catch (error) {
+      console.log(error);
     }
   }, []);
 
@@ -231,12 +299,17 @@ const App = () => {
         domStorageEnabled={true}
         originWhitelist={['*']}
         // @ts-ignore
-        onConsoleMessage={(event) => {
+        onConsoleMessage={event => {
           console.log('[WebView Console]', event.nativeEvent.message);
         }}
-        onLoadError={(syntheticEvent: any) => { // 다시 any 타입으로 변경
+        onLoadError={(syntheticEvent: any) => {
+          // 다시 any 타입으로 변경
           const { nativeEvent } = syntheticEvent;
-          console.error('[WebView Load Error]', nativeEvent.code, nativeEvent.description);
+          console.error(
+            '[WebView Load Error]',
+            nativeEvent.code,
+            nativeEvent.description,
+          );
         }}
       />
     </View>
