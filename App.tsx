@@ -1,5 +1,5 @@
 import React, { useRef, useCallback, useEffect } from 'react';
-import { View, StyleSheet, Alert, Button, Platform } from 'react-native';
+import { View, StyleSheet, Alert, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
 import {
   GoogleSignin,
@@ -164,105 +164,24 @@ const App = () => {
     }
   };
 
-  // const _signIn = async () => {
+  // const _signOut = async () => {
   //   try {
-  //     console.log('signIn');
-  //     await GoogleSignin.hasPlayServices();
-  //     const userInfo: SignInResponse = await GoogleSignin.signIn(); // Correctly type userInfo as SignInResponse
-  //     console.log('Google User Info:', userInfo);
-  //
-  //     let idToken = userInfo.data?.idToken;
-  //
-  //     if (idToken) {
-  //       // Send idToken to your backend
-  //       console.log('Sending idToken to backend:', idToken);
-  //       try {
-  //         const response = await axios.post(
-  //           `${BACKEND_URL}/api/auth/google/mobile`,
-  //           {
-  //             idToken: idToken,
-  //           },
-  //         );
-  //
-  //         const { token, user } = response.data;
-  //         console.log('Backend JWT:', token);
-  //         console.log('Backend User Data:', user);
-  //
-  //         // Store JWT securely
-  //         await AsyncStorage.setItem('userToken', token);
-  //         Alert.alert('로그인 성공', '백엔드로부터 JWT를 받았습니다!');
-  //
-  //         // Send JWT and user data to webview
-  //         // webViewRef.current?.postMessage(JSON.stringify({ type: 'LOGIN_SUCCESS', token: token, user: user }));
-  //         if (webViewRef.current) {
-  //           webViewRef.current.injectJavaScript(`
-  //     if (window.ReactNativeWebView) {
-  //           window.ReactNativeWebView.postMessage(JSON.stringify({
-  //             type: "LOGIN_SUCCESS",
-  //             token: "${token}", // token 값을 문자열로 삽입
-  //             user: ${JSON.stringify(user)}, // user 객체를 JSON 문자열로 삽입
-  //           }));
-  //         }
-  //         true;
-  //     `);
-  //         }
-  //       } catch (backendError: any) {
-  //         console.error(
-  //           'Backend API call failed:',
-  //           backendError.response?.data || backendError.message,
-  //         );
-  //         Alert.alert(
-  //           '로그인 오류',
-  //           `백엔드 로그인 실패: ${
-  //             backendError.response?.data?.message || backendError.message
-  //           }`,
-  //         );
-  //       }
-  //     } else {
-  //       Alert.alert('로그인 실패', 'Google ID Token을 얻을 수 없습니다.');
-  //     }
+  //     await GoogleSignin.revokeAccess();
+  //     await GoogleSignin.signOut();
+  //     await AsyncStorage.removeItem('userToken');
+  //     Alert.alert('로그아웃 성공', '성공적으로 로그아웃되었습니다.');
+  //     // Optionally, send a message to the webview to clear its state
+  //     webViewRef.current?.postMessage(
+  //       JSON.stringify({ type: 'LOGOUT_SUCCESS' }),
+  //     );
   //   } catch (error: any) {
-  //     if (error.code === statusCodes.SIGN_IN_CANCELLED) {
-  //       // user cancelled the login flow
-  //       Alert.alert('로그인 취소', '사용자가 로그인 흐름을 취소했습니다.');
-  //     } else if (error.code === statusCodes.IN_PROGRESS) {
-  //       // operation (e.g. sign in) is in progress already
-  //       Alert.alert('로그인 진행 중', '이미 로그인 작업이 진행 중입니다.');
-  //     } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
-  //       // play services not available or outdated
-  //       Alert.alert(
-  //         'Google Play 서비스 없음',
-  //         'Google Play 서비스가 없거나 오래되었습니다.',
-  //       );
-  //     } else {
-  //       // some other error happened
-  //       console.error('Google Sign-In Error:', error);
-  //       Alert.alert(
-  //         '로그인 오류',
-  //         `Google 로그인 중 오류가 발생했습니다: ${error.message}`,
-  //       );
-  //     }
+  //     console.error('Google Sign-Out Error:', error);
+  //     Alert.alert(
+  //       '로그아웃 오류',
+  //       `로그아웃 중 오류가 발생했습니다: ${error.message}`,
+  //     );
   //   }
   // };
-
-  const _signOut = async () => {
-    try {
-      await GoogleSignin.revokeAccess();
-      await GoogleSignin.signOut();
-      await AsyncStorage.removeItem('userToken');
-      Alert.alert('로그아웃 성공', '성공적으로 로그아웃되었습니다.');
-      // Optionally, send a message to the webview to clear its state
-      webViewRef.current?.postMessage(
-        JSON.stringify({ type: 'LOGOUT_SUCCESS' }),
-      );
-    } catch (error: any) {
-      console.error('Google Sign-Out Error:', error);
-      Alert.alert(
-        '로그아웃 오류',
-        `로그아웃 중 오류가 발생했습니다: ${error.message}`,
-      );
-    }
-  };
 
   // "퐁" 받기
   const handleWebMessage = useCallback((event: any) => {
@@ -285,10 +204,10 @@ const App = () => {
 
   return (
     <View style={styles.container}>
-      <View style={styles.buttonContainer}>
-        <Button title="Google 로그인" onPress={_signIn} />
-        <Button title="로그아웃" onPress={_signOut} />
-      </View>
+      {/*<View style={styles.buttonContainer}>*/}
+      {/*  <Button title="Google 로그인" onPress={_signIn} />*/}
+      {/*  <Button title="로그아웃" onPress={_signOut} />*/}
+      {/*</View>*/}
 
       <WebView
         ref={webViewRef}
