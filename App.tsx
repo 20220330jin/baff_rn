@@ -1,5 +1,5 @@
 import React, { useRef, useCallback, useEffect } from 'react';
-import { View, StyleSheet, Alert, Platform } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
 import {
   GoogleSignin,
@@ -129,7 +129,6 @@ const App = () => {
         `;
 
         webViewRef.current?.injectJavaScript(errorJsCode);
-        Alert.alert('로그인 오류', `백엔드 처리 실패: ${errorMessage}`);
       }
     } catch (error: any) {
       console.log('RN: 구글 로그인 실패', error);
@@ -160,28 +159,22 @@ const App = () => {
       `;
 
       webViewRef.current?.injectJavaScript(errorJsCode);
-      Alert.alert('로그인 실패', errorMessage);
     }
   };
 
-  // const _signOut = async () => {
-  //   try {
-  //     await GoogleSignin.revokeAccess();
-  //     await GoogleSignin.signOut();
-  //     await AsyncStorage.removeItem('userToken');
-  //     Alert.alert('로그아웃 성공', '성공적으로 로그아웃되었습니다.');
-  //     // Optionally, send a message to the webview to clear its state
-  //     webViewRef.current?.postMessage(
-  //       JSON.stringify({ type: 'LOGOUT_SUCCESS' }),
-  //     );
-  //   } catch (error: any) {
-  //     console.error('Google Sign-Out Error:', error);
-  //     Alert.alert(
-  //       '로그아웃 오류',
-  //       `로그아웃 중 오류가 발생했습니다: ${error.message}`,
-  //     );
-  //   }
-  // };
+  const _signOut = async () => {
+    try {
+      await GoogleSignin.revokeAccess();
+      await GoogleSignin.signOut();
+      await AsyncStorage.removeItem('userToken');
+      // Optionally, send a message to the webview to clear its state
+      webViewRef.current?.postMessage(
+        JSON.stringify({ type: 'LOGOUT_SUCCESS' }),
+      );
+    } catch (error: any) {
+      console.error('Google Sign-Out Error:', error);
+    }
+  };
 
   // "퐁" 받기
   const handleWebMessage = useCallback((event: any) => {
@@ -193,6 +186,10 @@ const App = () => {
         case 'REQUEST_GOOGLE_LOGIN':
           console.log('REQUEST_GOOGLE_LOGIN');
           _signIn();
+          break;
+        case 'REQUEST_GOOGLE_LOGOUT':
+          console.log('REQUEST_GOOGLE_LOGOUT');
+          _signOut();
           break;
         default:
           console.log('[App] <UNK> <UNK> <UNK> <UNK>');
