@@ -1,5 +1,11 @@
 import React, { useRef, useCallback, useEffect } from 'react';
-import { View, StyleSheet, Platform } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  Platform,
+  BackHandler,
+  ToastAndroid,
+} from 'react-native';
 import { WebView } from 'react-native-webview';
 import {
   GoogleSignin,
@@ -11,6 +17,45 @@ import axios from 'axios';
 
 const App = () => {
   const webViewRef = useRef<WebView>(null);
+  // 뒤로가기 버튼의 첫 번째 클릭을 추적하기 위한 Ref
+  const backPressedOnce = useRef(false);
+
+  // 안드로이드의 물리적 뒤로가기 버튼 동작을 처리하기 위한 useEffect
+  useEffect(() => {
+    // 뒤로가기 버튼을 눌렀을 때 실행될 콜백 함수
+    const backAction = () => {
+      // backPressedOnce Ref가 true이면 (2초 안에 다시 눌렸다는 의미)
+      if (backPressedOnce.current) {
+        BackHandler.exitApp(); // 앱을 종료합니다.
+        return true;
+      }
+
+      // 첫 번째 클릭이므로, Ref 값을 true로 설정합니다.
+      backPressedOnce.current = true;
+      // 사용자에게 안내 메시지를 짧게 보여줍니다.
+      ToastAndroid.show(
+        '한 번 더 뒤로가기 버튼을 누르면 종료됩니다.',
+        ToastAndroid.SHORT,
+      );
+
+      // 2초 후에 Ref 값을 다시 false로 초기화합니다.
+      setTimeout(() => {
+        backPressedOnce.current = false;
+      }, 2000);
+
+      return true; // true를 반환하여 기본 동작(앱 즉시 종료)을 막습니다.
+    };
+
+    // BackHandler에 위에서 정의한 콜백 함수를 이벤트 리스너로 등록합니다.
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      backAction,
+    );
+
+    // 컴포넌트가 언마운트될 때(화면에서 사라질 때) 등록했던 이벤트 리스너를 제거합니다.
+    // (메모리 누수 방지를 위해 필수적인 과정입니다.)
+    return () => backHandler.remove();
+  }, []);
 
   // Make sure this IP is correct and includes the query parameter
   // const WEB_URL = 'http://192.168.139.167:5173/?isReactNativeApp=true';
