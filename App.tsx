@@ -1,8 +1,7 @@
-import React, { useRef, useCallback, useEffect } from 'react';
+import React, { useRef, useCallback, useEffect, useState } from 'react';
 import {
   View,
   StyleSheet,
-  Platform,
   BackHandler,
   ToastAndroid,
 } from 'react-native';
@@ -14,16 +13,24 @@ import {
 } from '@react-native-google-signin/google-signin'; // Import SignInResponse type
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const App = () => {
+const AppContent = () => {
+  const insets = useSafeAreaInsets();
   const webViewRef = useRef<WebView>(null);
   // 뒤로가기 버튼의 첫 번째 클릭을 추적하기 위한 Ref
   const backPressedOnce = useRef(false);
+  const [canGoBack, setCanGoBack] = useState(false);
 
   // 안드로이드의 물리적 뒤로가기 버튼 동작을 처리하기 위한 useEffect
   useEffect(() => {
     // 뒤로가기 버튼을 눌렀을 때 실행될 콜백 함수
     const backAction = () => {
+      // WebView에서 뒤로가기가 가능한 경우
+      if (canGoBack && webViewRef.current) {
+        webViewRef.current.goBack();
+        return true; // 기본 동작 차단
+      }
       // backPressedOnce Ref가 true이면 (2초 안에 다시 눌렸다는 의미)
       if (backPressedOnce.current) {
         BackHandler.exitApp(); // 앱을 종료합니다.
@@ -55,12 +62,20 @@ const App = () => {
     // 컴포넌트가 언마운트될 때(화면에서 사라질 때) 등록했던 이벤트 리스너를 제거합니다.
     // (메모리 누수 방지를 위해 필수적인 과정입니다.)
     return () => backHandler.remove();
+  }, [canGoBack]);
+
+  // WebView의 네비게이션 상태 변경을 처리하는 함수 추가
+  const handleNavigationStateChange = useCallback((navState: any) => {
+    setCanGoBack(navState.canGoBack);
+    // 페이지가 변경될 때마다 뒤로가기 상태 초기화
+    backPressedOnce.current = false;
   }, []);
 
   // Make sure this IP is correct and includes the query parameter
   // const WEB_URL = 'http://192.168.139.167:5173/?isReactNativeApp=true';
   // const WEB_URL = 'http://192.168.35.228:5173/?isReactNativeApp=true';
-  const WEB_URL = 'https://baff-fe.vercel.app/?isReactNativeApp=true';
+  // const WEB_URL = 'https://baff-fe.vercel.app/?isReactNativeApp=true';
+  const WEB_URL = 'https://change-up.me/?isReactNativeApp=true';
   // const BACKEND_URL = 'http://10.0.2.2:8080'; // Assuming backend runs on 8080
   const BACKEND_URL = 'https://baff-be-ckop.onrender.com'; // Assuming backend runs on 8080
 
@@ -245,17 +260,18 @@ const App = () => {
   }, []);
 
   return (
-    <View style={styles.container}>
-      {/*<View style={styles.buttonContainer}>*/}
-      {/*  <Button title="Google 로그인" onPress={_signIn} />*/}
-      {/*  <Button title="로그아웃" onPress={_signOut} />*/}
-      {/*</View>*/}
-
+    // <View style={styles.container}>
+    <View style={{
+      flex: 1,
+      paddingTop: insets.top,
+      paddingBottom: insets.bottom,
+    }}>
       <WebView
         ref={webViewRef}
         source={{ uri: WEB_URL }}
         style={styles.webView}
         onMessage={handleWebMessage}
+        onNavigationStateChange={handleNavigationStateChange}
         javaScriptEnabled={true}
         domStorageEnabled={true}
         originWhitelist={['*']}
@@ -277,17 +293,25 @@ const App = () => {
   );
 };
 
+const App = () => {
+  return (
+    <SafeAreaProvider>
+      <AppContent />
+    </SafeAreaProvider>
+  )
+}
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingTop: Platform.OS === 'android' ? 25 : 0,
-  },
-  buttonContainer: {
-    padding: 10,
-    backgroundColor: '#f0f0f0',
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
+  // container: {
+  //   flex: 1,
+  //   paddingTop: Platform.OS === 'android' ? 25 : 0,
+  // },
+  // buttonContainer: {
+  //   padding: 10,
+  //   backgroundColor: '#f0f0f0',
+  //   flexDirection: 'row',
+  //   justifyContent: 'space-around',
+  // },
   webView: {
     flex: 1,
   },
