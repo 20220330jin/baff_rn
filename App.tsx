@@ -4,8 +4,12 @@ import {
   StyleSheet,
   BackHandler,
   ToastAndroid,
+  Platform,
+  Linking,
+  Alert,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
+// import SendIntentAndroid from 'react-native-send-intent';
 import {
   GoogleSignin,
   statusCodes,
@@ -13,7 +17,11 @@ import {
 } from '@react-native-google-signin/google-signin'; // Import SignInResponse type
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
-import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  SafeAreaProvider,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
+// import { ShouldStartLoadRequest } from 'react-native-webview/lib/WebViewTypes';
 
 const AppContent = () => {
   const insets = useSafeAreaInsets();
@@ -77,7 +85,7 @@ const AppContent = () => {
   // const WEB_URL = 'https://baff-fe.vercel.app/?isReactNativeApp=true';
   const WEB_URL = 'https://change-up.me/?isReactNativeApp=true';
   // const BACKEND_URL = 'http://10.0.2.2:8080'; // Assuming backend runs on 8080
-  const BACKEND_URL = 'https://baff-be-ckop.onrender.com'; // Assuming backend runs on 8080
+  const BACKEND_URL = 'https://api.change-up.me'; // Assuming backend runs on 8080
 
   // Google Web Client ID from AuthController.java
   const GOOGLE_WEB_CLIENT_ID =
@@ -259,13 +267,82 @@ const AppContent = () => {
     }
   }, []);
 
+  // const handleExternalLink = (request: ShouldStartLoadRequest): boolean => {
+  //   const url = request.url;
+  //   console.log('[Navigation] Handling URL:', url);
+  //
+  //   if (url.startsWith('intent://')) {
+  //     if (Platform.OS === 'android') {
+  //       handleIntentUrl(url).catch(e =>
+  //         console.error('handleIntentUrl failed', e),
+  //       );
+  //     }
+  //     return false;
+  //   }
+  //
+  //   if (url.startsWith('kakaotalk://') || url.startsWith('kakaolink://')) {
+  //     handleKakaoUrl(url).catch(e => console.error('handleKakaoUrl failed', e));
+  //     return false;
+  //   }
+  //
+  //   if (url.startsWith('http://') || url.startsWith('https://')) {
+  //     if (url.includes('change-up.me')) {
+  //       return true;
+  //     }
+  //     handleHttpUrl(url).catch(e => console.error('handleHttpUrl failed', e));
+  //     return false;
+  //   }
+  //
+  //   return true;
+  // };
+
+  // const handleIntentUrl = async (url: string) => {
+  //   try {
+  //     console.log('[Intent] Trying to open with SendIntentAndroid:', url);
+  //     await SendIntentAndroid.openAppWithUri(url);
+  //   } catch (error) {
+  //     console.log('[ERROR] SendIntentAndroid failed, trying fallback:', error);
+  //     const fallbackUrl = url.match(/browser_fallback_url=([^&]+)/)?.[1];
+  //     if (fallbackUrl) {
+  //       const decodedUrl = decodeURIComponent(fallbackUrl);
+  //       console.log('[FALLBACK] Opening fallback URL:', decodedUrl);
+  //       await Linking.openURL(decodedUrl).catch(err => console.error("Fallback Linking failed", err));
+  //     } else {
+  //       console.log('[ERROR] No fallback URL found. Opening KakaoTalk store.');
+  //       const storeUrl = 'market://details?id=com.kakao.talk';
+  //       await Linking.openURL(storeUrl).catch(() => {
+  //         Linking.openURL('https://play.google.com/store/apps/details?id=com.kakao.talk');
+  //       });
+  //     }
+  //   }
+  // };
+  //
+  // const handleKakaoUrl = async (url: string) => {
+  //   try {
+  //     await Linking.openURL(url);
+  //   } catch (error) {
+  //     console.log('[ERROR] Failed to open KakaoTalk URL:', error);
+  //     Alert.alert('카카오톡을 열 수 없습니다.', '앱이 설치되어 있는지 확인해주세요.');
+  //   }
+  // };
+  //
+  // const handleHttpUrl = async (url: string) => {
+  //   try {
+  //     await Linking.openURL(url);
+  //   } catch (error) {
+  //     console.log('[ERROR] Failed to open HTTP URL:', error);
+  //   }
+  // };
+
   return (
     // <View style={styles.container}>
-    <View style={{
-      flex: 1,
-      paddingTop: insets.top,
-      paddingBottom: insets.bottom,
-    }}>
+    <View
+      style={{
+        flex: 1,
+        paddingTop: insets.top,
+        paddingBottom: insets.bottom,
+      }}
+    >
       <WebView
         ref={webViewRef}
         source={{ uri: WEB_URL }}
@@ -275,6 +352,46 @@ const AppContent = () => {
         javaScriptEnabled={true}
         domStorageEnabled={true}
         originWhitelist={['*']}
+        onShouldStartLoadWithRequest={event => {
+          const { url } = event;
+
+          // 1. http, https 링크는 WebView가 계속 로드하도록 허용
+          if (url.startsWith('http://') || url.startsWith('https://')) {
+            return true;
+          }
+
+          // 2. 안드로이드의 intent 링크인 경우, kakaolink로 변환하여 실행
+          if (Platform.OS === 'android' && url.startsWith('intent://')) {
+            // 이전에 우리가 했던 URL 변환 방식입니다. 라이브러리 없이 가장 확실합니다.
+            const appUrl = url
+              .replace('intent://', 'kakaolink://')
+              .split('#Intent')[0];
+
+            Linking.openURL(appUrl).catch(err => {
+              console.error('카카오톡 앱 열기 실패', err);
+              Alert.alert(
+                '오류',
+                '카카오톡을 열 수 없습니다. 앱이 설치되어 있는지 확인해주세요.',
+              );
+            });
+
+            // WebView의 동작은 즉시 막습니다.
+            return false;
+          }
+
+          // 3. 그 외 모든 외부 링크 (mailto:, tel: 등) 처리
+          Linking.openURL(url).catch(err => {
+            console.error('외부 앱 열기 실패', err);
+            Alert.alert('오류', '해당 앱을 열 수 없습니다.');
+          });
+
+          // WebView의 동작은 즉시 막습니다.
+          return false;
+        }}
+        // onShouldStartLoadWithRequest={(request) => {
+        //   console.log('[Navigation] URL:', request.url);
+        //   return handleExternalLink(request);
+        // }}
         // @ts-ignore
         onConsoleMessage={event => {
           console.log('[WebView Console]', event.nativeEvent.message);
@@ -298,8 +415,8 @@ const App = () => {
     <SafeAreaProvider>
       <AppContent />
     </SafeAreaProvider>
-  )
-}
+  );
+};
 
 const styles = StyleSheet.create({
   // container: {
